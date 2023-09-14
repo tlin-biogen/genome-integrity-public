@@ -17,7 +17,7 @@ aav_GI_plot <- function(dataset, x, y) {
     )+
     ylim(-3.5,101)+
     xlab("Concentration (copies/uL)")+
-    ylab("Full genome (%)")
+    ylab("Calculated integrity (%)")
 }
 #############################################################################
 
@@ -50,26 +50,26 @@ aav_raw_compiled<-separate(aav_raw_compiled,Sample,into=c("Sample_num","Replicat
 
 # update target names to match manuscript
 aav_raw_compiled <- aav_raw_compiled %>%
-  mutate(Target = str_replace_all(Target, c("1" = "prom", "2" = "pA")))
+  mutate(Target = str_replace_all(Target, c("1" = "CMV", "2" = "pA")))
 
 # filter into separate dfs by target (since droplet info is in duplicate)
-aav_prom<- aav_raw_compiled %>% filter(Target=="prom") 
+aav_CMV<- aav_raw_compiled %>% filter(Target=="CMV") 
 aav_pA<- aav_raw_compiled %>% filter(Target=="pA") 
 
 # expected integrity values for each exp
-aav_prom$expected <- rep(as.numeric(c("84","63","42","21","10","5","0")), each=4,6)
+aav_CMV$expected <- rep(as.numeric(c("84","63","42","21","10","5","0")), each=4,6)
 
 # calculate %integrity with: BioRad %Linkage calculation equation 1 from Pranter 2023 S1 Text
-aav_prom$BR1 <- aav_prom$Linkage/((aav_prom$Concentration+aav_pA$Concentration)/2)*100
+aav_CMV$BR1 <- aav_CMV$Linkage/((aav_CMV$Concentration+aav_pA$Concentration)/2)*100
 
 # order data by experiment & sample number to accurately label theoretical copies for experiments
-aav_prom <- aav_prom %>% arrange(Experiment,Sample_num)
-aav_prom$copies<-rep(as.numeric(c("498","249","125","62")),42)
+aav_CMV <- aav_CMV %>% arrange(Experiment,Sample_num)
+aav_CMV$copies<-rep(as.numeric(c("498","249","125","62")),42)
 
 #sep expected to create a label
-exp_lab = paste(aav_prom$expected, "%", sep = "")
+exp_lab = paste(aav_CMV$expected, "%", sep = "")
 
-BR1_aav<-aav_GI_plot(aav_prom,copies, BR1) + theme(legend.position = "none") +   
+BR1_aav<-aav_GI_plot(aav_CMV,copies, BR1) + theme(legend.position = "none") +   
   geom_text(aes(650,expected,label = exp_lab, vjust = -0.5),show.legend = FALSE)
 
 ############################################################################################################
@@ -102,10 +102,10 @@ aav_app<-separate(aav_app,SAMPLE,into=c("Sample_num","Replicate"),sep = "_")
 
 # update target names to match Exp_131
 aav_app<- aav_app %>% 
-  mutate(TARGET = str_replace_all(TARGET, c("1"="prom","2"="pA")))
+  mutate(TARGET = str_replace_all(TARGET, c("1"="CMV","2"="pA")))
 
-#filtered arbitrarily by prom target (since droplet info is in duplicate)
-aav_app <- aav_app %>% filter(TARGET=="prom") 
+#filtered arbitrarily by CMV target (since droplet info is in duplicate)
+aav_app <- aav_app %>% filter(TARGET=="CMV") 
 
 #create columns with theoretical expected % integrity + copy number
 aav_app$expected<-rep(as.numeric(c("84","63","42","21","10","5","0")),each=4,6)
@@ -116,13 +116,18 @@ shiny_aav <- aav_GI_plot(aav_app,copies, ESTIMATED_PERCENTAGE) + theme(legend.po
   geom_text(aes(650,expected,label = exp_aav, vjust = -0.5),show.legend = FALSE)
 
 library(patchwork)
-BR1_aav+shiny_aav + plot_annotation(tag_levels = "A")
+#plot linkage and shiny model results together 
+#"&" adds the element to all subplots
+BR1_aav+shiny_aav + plot_annotation(tag_levels = "A") & 
+  theme(plot.tag = element_text(face = 'bold'))
+
+
 ###############################################################################
 #linearity linkage vs shiny
 ###############################################################################
 
 # avg %integrity and %recovery of biorad models
-aav_avg_raw <- aav_prom %>% 
+aav_avg_raw <- aav_CMV %>% 
   filter(!expected== c("0")) %>% 
   group_by(Sample_num,
            Experiment,
@@ -207,11 +212,11 @@ dat %>%
   theme_classic(base_size = 12)+
   annotate("text",
            x = 5, y = 90, 
-           label = "italic(y) == 8.31 + 1.05 * italic(x) * ',' ~~ italic(R) [pseudo] ^2 ~ '=' ~ 0.989",
+           label = "italic(y) == 8.31 + 1.05 * italic(x) * ',' ~~ italic(R) [pseudo] ^2 ~ '=' ~ '0.989'",
            parse = TRUE,color = "#6388b4", hjust = 0, vjust = 0) +
   annotate("text",
            x = 5, y = 90, 
-           label = "italic(y) == -1.16 + 1.01 * italic(x) * ',' ~~ italic(R) [pseudo] ^2 ~ '=' ~ 0.996",
+           label = "italic(y) == -1.16 + 1.01 * italic(x) * ',' ~~ italic(R) [pseudo] ^2 ~ '=' ~ '0.996'",
            parse = TRUE,color = "#c3bc3f", hjust = 0, vjust = 1.1) +
   xlab("Expected integrity (%)")+
   ylab("Calculated integrity (%)")+

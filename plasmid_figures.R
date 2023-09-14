@@ -2,7 +2,7 @@ library(tidyverse)
 library(kableExtra)
 #############################################################################
 # plotting function & color blindness friendly color palette
-cols<-c("#767676" ,"#6388b4","#55ad89" , "#ffae34", "#8cc2ca" , "#ef6f6a","#c3bc3f" ,"#bb7693" )
+cols<-c("#767676", "#6388b4", "#55ad89", "#ffae34", "#8cc2ca", "#ef6f6a", "#c3bc3f", "#bb7693" )
 #plotting function
 GI_plot <- function(dataset, x, y) {
   ggplot(dataset, aes({{x}}, {{y}},color=Sample_num)) + 
@@ -17,7 +17,7 @@ GI_plot <- function(dataset, x, y) {
     )+
     ylim(-3.5,101)+
     xlab("Concentration (copies/uL)")+
-    ylab("Full genome (%)")
+    ylab("Calculated integrity (%)")
 }
 
 #############################################################################
@@ -39,41 +39,41 @@ raw_compiled <- raw_compiled %>%
 
 # update target names to match manuscript
 raw_compiled <- raw_compiled %>%
-  mutate(Target = str_replace_all(Target, c("1" = "prom", "2" = "pA")))
+  mutate(Target = str_replace_all(Target, c("1" = "pA", "2" = "CMV")))
 
 # separate Sample into sample # and replicate #
 raw_compiled<-separate(raw_compiled,Sample,into=c("Sample_num","Replicate"),sep = "_")
 
 # filter into separate dfs by target (since droplet info is in duplicate)
-prom<- raw_compiled %>% filter(Target=="prom") 
+CMV<- raw_compiled %>% filter(Target=="CMV") 
 pA<- raw_compiled %>% filter(Target=="pA") 
 
 # calculate %integrity with formula 1: double positive/total positive droplets
-prom$percentmodel <- prom$`Ch1+Ch2+`/(prom$AcceptedDroplets-prom$`Ch1-Ch2-`)*100
+CMV$percentmodel <- CMV$`Ch1+Ch2+`/(CMV$AcceptedDroplets-CMV$`Ch1-Ch2-`)*100
 
 # calculate %integrity with: BioRad %Linkage calculation equation 1 from Pranter 2023 S1 Text
-prom$BR1 <- prom$Linkage/((prom$Concentration+pA$Concentration)/2)*100
+CMV$BR1 <- CMV$Linkage/((CMV$Concentration+pA$Concentration)/2)*100
 
 # calculate %integrity with: BioRad %Linkage calculation equation 3 from Pranter 2023 S1 Text
 # first solve BioRad eq 2 from S1 text
-prom$linkcomp<-prom$Linkage+(abs(prom$Concentration-pA$Concentration))
-# second find max prom vs pA concentration and solve eq 3 
+CMV$linkcomp<-CMV$Linkage+(abs(CMV$Concentration-pA$Concentration))
+# second find max CMV vs pA concentration and solve eq 3 
 max_vals<-raw_compiled%>%
   group_by(Sample_num,Replicate,Experiment) %>%
   summarize(max_val = max(Concentration, na.rm=TRUE))
 
-prom <- left_join(prom, max_vals, by = join_by(Experiment == Experiment,Replicate == Replicate,Sample_num == Sample_num, ))
+CMV <- left_join(CMV, max_vals, by = join_by(Experiment == Experiment,Replicate == Replicate,Sample_num == Sample_num, ))
 
-prom$BR3 <- prom$linkcomp/prom$max_val*100
+CMV$BR3 <- CMV$linkcomp/CMV$max_val*100
 
 # create columns with theoretical expected % integrity + copy number
-prom$expected <-rep(as.numeric(c("0","8","18","29","43","60","82","100")),each=12,2)
+CMV$expected <-rep(as.numeric(c("0","8","18","29","43","60","82","100")),each=12,2)
 
-prom$copies <- rep(as.numeric(c("5000","4000","3000","2000","1000","500","250","125",
-                                "63","31","16","8")),16) 
+CMV$copies <- rep(as.numeric(c("5000","4000","3000","2000","1000","500","250","125",
+                               "63","31","16","8")),16) 
 
 # Table 1: Percent recovery of integrity calculated by percentage of double positive droplets/total positive droplets
-table1 <- prom %>% 
+table1 <- CMV %>% 
   group_by(copies, expected) %>% 
   summarise(rec_percentmodel=mean(percentmodel/expected*100))
 table1 <-table1 %>% pivot_wider(names_from = expected, values_from = rec_percentmodel)
@@ -81,7 +81,7 @@ table1$`0`[table1$`0`  %in% c("Inf", "NaN")] <- "NA"
 table1 %>% kbl(digits = 1) %>% kable_styling(latex_options = "striped")
 
 # Table 2:Percent recovery of integrity calculated by linkage models
-table2 <- prom %>% 
+table2 <- CMV %>% 
   group_by(Sample_num) %>% 
   summarise(avg_BR1= mean(BR1),
             avg_BR3= mean(BR3),
@@ -92,27 +92,21 @@ table2 <- prom %>%
 table2 %>% kbl(digits = 1) %>% kable_styling(latex_options = "striped")
 
 # plot model results
+
 # labels for geom_hline lines
-exp_val = paste(prom$expected, "%", sep = "")
+exp_val = paste(CMV$expected, "%", sep = "")
 
 #plot results for each model
-percentmodel<-GI_plot(prom,copies, percentmodel)  + theme(legend.position = "none") +expand_limits(x = 8500)+  
+percentmodel<-GI_plot(CMV,copies, percentmodel)  + theme(legend.position = "none") +expand_limits(x = 8500)+  
+  geom_text(aes(8000,expected,label = exp_val, vjust = -0.5),show.legend = FALSE)
+percentmodel
+
+BR1<-GI_plot(CMV,copies, BR1) + theme(legend.position = "none") +expand_limits(x = 8500)+ #ggtitle("BioRad %Linked, eq.1") +   
   geom_text(aes(8000,expected,label = exp_val, vjust = -0.5),show.legend = FALSE)
 
-BR1<-GI_plot(prom,copies, BR1) + theme(legend.position = "none") +expand_limits(x = 8500)+ #ggtitle("BioRad %Linked, eq.1") +   
+BR3<-GI_plot(CMV,copies, BR3) + theme(legend.position = "none") +expand_limits(x = 8500)+#ggtitle("BioRad %Linked, eq.3") +   
   geom_text(aes(8000,expected,label = exp_val, vjust = -0.5),show.legend = FALSE)
 
-BR3<-GI_plot(prom,copies, BR3) + theme(legend.position = "none") +expand_limits(x = 8500)+#ggtitle("BioRad %Linked, eq.3") +   
-  geom_text(aes(8000,expected,label = exp_val, vjust = -0.5),show.legend = FALSE)
-
-# library(ggpubr)
-# ggarrange(BR1, BR3,
-#           labels = c("A", "B"),
-#           ncol = 2, nrow = 1,
-#           common.legend = TRUE,legend="right")
-
-library(patchwork) 
-BR1+BR3
 
 ############################################################################################################
 # clean and sort analysed data from Poisson-multinomial Shiny app, plot calculated integrity
@@ -129,10 +123,10 @@ app_compiled <- app_compiled %>%
 
 # update target names to match manuscript
 app_compiled <- app_compiled %>%
-  mutate(TARGET = str_replace_all(TARGET, c("1" = "prom", "2" = "pA")))
+  mutate(TARGET = str_replace_all(TARGET, c("1" = "pA", "2" = "CMV")))
 
-#filtered arbitrarily by prom target (since droplet info is in duplicate)
-app_compiled <- app_compiled %>% filter(TARGET=="prom") 
+#filtered arbitrarily by CMV target (since droplet info is in duplicate)
+app_compiled <- app_compiled %>% filter(TARGET=="CMV") 
 
 #create columns with theoretical expected % integrity + copy number
 app_compiled$expected <-rep(as.numeric(c("0","8","18","29","43","60","82","100")),each=12,2)
@@ -168,7 +162,7 @@ shiny<-GI_plot(app_compiled,copies, ESTIMATED_PERCENTAGE) + theme(legend.positio
 
 #compare linearity of models
 # summarize linkage models
-linkage_linearity <- prom %>% 
+linkage_linearity <- CMV %>% 
   group_by(Sample_num,
            Experiment,
            expected) %>% 
@@ -244,6 +238,8 @@ dat %>% ggplot(aes(x = est.gls, y = resid.gls, color = model)) + geom_point() +
   scale_color_manual(labels = c("Linkage (avg)","Linkage (comp)", "Poisson-multinomial"), 
                      values = c("#6388b4" ,"#c3bc3f","#bb7693"))
 
+
+
 # linearity plot
 lin<-dat %>% 
   ggplot(aes(expected, value,color=model)) + 
@@ -251,28 +247,24 @@ lin<-dat %>%
   geom_line(aes(y = est.gls), linewidth = 1,)+
   theme_classic(base_size = 12)+
   annotate("text",
-           x = 5, y = 95, 
-           label = "italic(y) == 14.3 +0.899 * italic(x) * ',' ~~ italic(R) [pseudo] ^2 ~ '=' ~ 0.972",
+           x = 5, y = 95,
+           label = "italic(y) == 14.3 +0.899 * italic(x) * ',' ~~ italic(R) [pseudo] ^2 ~ '=' ~ '0.972'",
            parse = TRUE,color = "#6388b4", hjust = 0, vjust = 0) +
   annotate("text",
-           x = 5, y = 95, 
-           label = "italic(y) == 17.3 + 0.877 * italic(x) * ',' ~~ italic(R) [pseudo] ^2 ~ '=' ~ 0.970",
+           x = 5, y = 95,
+           label = "italic(y) == 17.3 + 0.877 * italic(x) * ',' ~~ italic(R) [pseudo] ^2 ~ '=' ~ '0.970'",
            parse = TRUE,color = "#c3bc3f", hjust = 0, vjust = 1.1) +
   annotate("text",
-           x = 5, y = 95, 
-           label = "italic(y) == -0.156 + 0.968 * italic(x) * ',' ~~ italic(R) [pseudo] ^2 ~ '=' ~ 1.0",
+           x = 5, y = 95,
+           label = "italic(y) == -0.156 + 0.968 * italic(x) * ',' ~~ italic(R) [pseudo] ^2 ~ '=' ~ '1.0'",
            parse = TRUE,color = "#bb7693", hjust = 0, vjust = 2.1) +
   xlab("Expected integrity (%)")+
   ylab("Calculated integrity (%)")+
   scale_color_manual(labels = c("Linkage (avg)","Linkage (comp)", "Poisson-multinomial"), 
                      values = c("#6388b4" ,"#c3bc3f","#bb7693"))+ theme(legend.position = c(0.8, 0.3))
 
-#plot linkage and shiny model results together
+
+#plot linkage and shiny model results together 
+#"&" adds the element to all subplots
 library(patchwork)
-(BR1+BR3)/(shiny+lin) + plot_annotation(tag_levels = "A")
-
-# library(ggpubr)
-# ggarrange(BR1, BR3, shiny, lin,
-#           labels = c("A", "B", "C","D"),
-#           ncol = 2, nrow = 2)
-
+(BR1+BR3)/(shiny+lin) + plot_annotation(tag_levels = "A") & theme(plot.tag = element_text(face = 'bold'))

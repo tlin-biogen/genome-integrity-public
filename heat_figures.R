@@ -104,7 +104,7 @@ heat_app_T1 <- heat_app_T1 %>%
   rename("model_result" = "ESTIMATED_PERCENTAGE")
 
 compiled<-bind_rows(heat_app_T1, heat_T1_longer)
-compiled$model <- factor(compiled$model, levels= c("shiny","BR1","BR3"))
+compiled <- compiled %>% arrange(model)
 # New facet label names
 treat_labels <- c("0 min.","1 min.","5 min.","10 min.","20 min.","30 min.")
 names(treat_labels) <- c("95C_0","95C_01","95C_05","95C_10","95C_20","95C_30")
@@ -114,17 +114,16 @@ cols<-c("#8cc2ca" ,"#c3bc3f" ,"#55ad89")
 r<-ggplot(compiled, aes(model, model_result,color=model)) + 
   stat_summary(geom = "bar", fun = mean, aes(fill = model)) +
   facet_grid(~ treat)+
-  scale_x_discrete(limits = c("BR1","BR3","shiny"))+
   geom_hline(aes(yintercept=expected),linetype='dashed', color="grey35",linewidth=1.1) +
   scale_fill_manual(values=cols,name="Model",
-                    labels=c("Poisson multinomial","%Linkage avg.",
-                             "%Linkage comp."))+
+                    labels=c("Linkage (avg)","Linkage (comp)",
+                             "Poisson multinomial"))+
   guides(color = "none", size = "none")+
   theme_classic(base_size = 12)+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())+
   scale_y_continuous(expand = c(0, 0), limits = c(0,100)) +  
-  ylab("Full genome (%)")+
+  ylab("Calculated integrity (%)")+
   scale_colour_manual(values=cols)
 r+facet_grid(~ treat,labeller = labeller(treat = treat_labels))
