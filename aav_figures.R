@@ -16,7 +16,7 @@ aav_GI_plot <- function(dataset, x, y) {
     theme_classic(#base_size = 14
     )+
     ylim(-3.5,101)+
-    xlab("Concentration (copies/uL)")+
+    xlab(expression(paste("Concentration (copies/",mu,"L)")))+
     ylab("Calculated integrity (%)")
 }
 #############################################################################
